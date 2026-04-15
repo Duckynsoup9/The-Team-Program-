@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Math Lab 3.0: Multi-Device Squad</title>
+    <style>
+        body { margin: 0; background: #050505; color: #00ff00; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; touch-action: none; }
+        #ui-bar { position: fixed; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.8); padding: 8px; border: 1px solid #00ff00; font-size: 12px; }
+        #crosshair { width: 40px; height: 40px; border: 2px dashed #ff0000; position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 1000; }
+        #crosshair::after { content: ''; position: absolute; background: #ff0000; top: 18px; left: -10px; width: 60px; height: 2px; }
+        #crosshair::before { content: ''; position: absolute; background: #ff0000; left: 18px; top: -10px; width: 2px; height: 60px; }
+        .target { width: 60px; height: 60px; background: #111; border: 2px solid #00ff00; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; }
+        .boss { border-color: #ff00ff; color: #ff00ff; width: 80px; height: 80px; box-shadow: 0 0 15px #ff00ff; }
+        
+        /* CHAT & LEADERBOARD */
+        #leaderboard { position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); border: 1px solid #00ff00; padding: 10px; width: 120px; font-size: 11px; }
+        #chat-box { position: fixed; bottom: 10px; left: 10px; width: 200px; height: 120px; background: rgba(0,20,0,0.9); border: 1px solid #00ff00; display: flex; flex-direction: column; z-index: 2000; font-size: 10px; }
+        #chat-history { flex-grow: 1; overflow-y: auto; padding: 5px; }
+        #chat-msg { background: #000; color: #0f0; border: none; border-top: 1px solid #00ff00; padding: 5px; font-family: monospace; width: 100%; box-sizing: border-box; }
+
+        /* MOBILE CONTROLS (Hidden by default) */
+        #mobile-controls { position: fixed; bottom: 20px; right: 20px; display: none; grid-template-columns: repeat(3, 50px); gap: 5px; z-index: 2500; }
+        .joy-btn { width: 50px; height: 50px; background: rgba(0,255,0,0.2); border: 2px solid #00ff00; color: #0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: bold; }
+        #scan-btn { grid-column: 2; background: rgba(255,0,0,0.3); border-color: #f00; }
+
+        /* SETUP SCREEN */
+        #setup { position: fixed; inset: 0; background: #000; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .choice-btn { padding: 15px 30px; margin: 10px; background: #222; border: 1px solid #00ff00; color: #0f0; cursor: pointer; }
+        .selected { background: #00ff00; color: #000; }
+    </style>
+</head>
+<body>
+    <div id="setup">
+        <h1>[ MATH LAB 3.0 ]</h1>
+        <p>Enter 7 Names (comma separated):</p>
+        <input type="text" id="names" value="James, Player 2, Player 3, Player 4, Player 5, Player 6, Player 7" style="background:#111; color:#0f0; border:1px solid #0f0; padding:10px; width:300px;"><br>
+        <p>SELECT DEVICE:</p>
+        <div>
+            <button class="choice-btn selected" id="btn-pc" onclick="setDevice('pc')">DESKTOP (Keyboard)</button>
+            <button class="choice-btn" id="btn-mobile" onclick="setDevice('mobile')">MOBILE (On-Screen)</button>
+        </div>
+        <button onclick="init()" style="margin-top:20px; padding:10px 40px; background:#0f0; font-weight:bold; cursor:pointer;">START LAB</button>
+    </div>
+
+    <div id="ui-bar">USER: <span id="p-name">---</span> | DATA: <span id="pts">0</span> | TIME: <span id="timer">30</span>s<br>MAG: <span id="mag">10</span>/10</div>
+    <div id="leaderboard"><strong>RANKINGS</strong><hr><div id="ranks"></div></div>
+    <div id="chat-box"><div id="chat-history"></div><input type="text" id="chat-msg" placeholder="Chat here..."></div>
+    
+    <div id="mobile-controls">
+        <div></div><div class="joy-btn" onpointerdown="move('up')">▲</div><div></div>
+        <div class="joy-btn" onpointerdown="move('left')">◀</div><div class="joy-btn" id="scan-btn" onpointerdown="action()">SCAN</div><div class="joy-btn" onpointerdown="move('right')">▶</div>
+        <div></div><div class="joy-btn" onpointerdown="move('down')">▼</div><div></div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="game-area"></div>
+
+    <script>
+        let players = [], scores = {}, curIdx = 0, pts = 0, mag = 10, timeLeft = 30, device = 'pc';
+        let x = window.innerWidth/2, y = window.innerHeight/2, active = false, speed = 25;
+
+        function setDevice(d) {
+            device = d;
+            document.getElementById('btn-pc').classList.toggle('selected', d === 'pc');
+            document.getElementById('btn-mobile').classList.toggle('selected', d === 'mobile');
+        }
+
+        function init() {
+            players = document.getElementById('names').value.split(',').map(n => n.trim());
+            players.forEach(p => scores[p] = 0);
+            if(device === 'mobile') document.getElementById('mobile-controls').style.display = 'grid';
+            document.getElementById('setup').style.display = 'none';
+            startRound();
+        }
+
+        function startRound() {
+            if (curIdx >= players.length) return alert("TOURNAMENT OVER.");
+            pts = 0; timeLeft = 30; mag = 10; active = true;
+            document.getElementById('p-name').innerText = players[curIdx];
+            sysMsg(`*** ${players[curIdx]}'s TURN ***`);
+            spawn();
+            const clock = setInterval(() => {
+                timeLeft--; document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(clock); active = false;
+                    scores[players[curIdx]] = pts;
+                    updateRanks(); curIdx++;
+                    document.getElementById('game-area').innerHTML = `<div style="text-align:center;margin-top:150px;"><button onclick="startRound()" style="padding:20px; background:#0f0; font-weight:bold;">NEXT PLAYER READY</button></div>`;
+                }
+            }, 1000);
+        }
+
+        function spawn() {
+            if (!active) return;
+            const area = document.getElementById('game-area');
+            area.innerHTML = '';
+            const t = document.createElement('div');
+            const isBoss = Math.random() < 0.25;
+            t.className = isBoss ? 'target boss' : 'target';
+            t.id = "active-target";
+            t.innerText = isBoss ? "BOSS" : "DATA";
+            t.style.left = Math.random() * (window.innerWidth - 100) + 'px';
+            t.style.top = Math.random() * (window.innerHeight - 250) + 100 + 'px';
+            area.appendChild(t);
+        }
+
+        function move(dir) {
+            if(!active) return;
+            if(dir === 'up') y -= speed; if(dir === 'down') y += speed;
+            if(dir === 'left') x -= speed; if(dir === 'right') x += speed;
+            const ch = document.getElementById('crosshair');
+            ch.style.left = x + 'px'; ch.style.top = y + 'px';
+        }
+
+        function action() {
+            if(!active || mag <= 0) return;
+            mag--; 
+            const target = document.getElementById('active-target');
+            if (target) {
+                const rect = target.getBoundingClientRect();
+                if (x > rect.left && x < rect.right && y > rect.top && y < rect.bottom) {
+                    const isBoss = target.classList.contains('boss');
+                    pts += isBoss ? 50 : 10;
+                    if(isBoss) sysMsg(`${players[curIdx]} DESTROYED A BOSS!`);
+                    spawn();
+                }
+            }
+            if (mag === 0) setTimeout(() => { mag = 10; updateUI(); }, 1000);
+            updateUI();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(device !== 'pc' || !active) return;
+            if(e.key.includes("Arrow")) move(e.key.replace("Arrow","").toLowerCase());
+            if(e.key === " ") action();
+        });
+
+        function sysMsg(txt) {
+            const h = document.getElementById('chat-history');
+            h.innerHTML += `<div>> ${txt}</div>`;
+            h.scrollTop = h.scrollHeight;
+        }
+
+        function updateUI() {
+            document.getElementById('pts').innerText = pts;
+            document.getElementById('mag').innerText = mag === 0 ? "RELOAD" : mag;
+        }
+
+        function updateRanks() {
+            const sorted = Object.entries(scores).sort((a,b) => b - a);
+            document.getElementById('ranks').innerHTML = sorted.map(s => `<div>${s[0]}: ${s[1]}</div>`).join('');
+        }
+    </script>
+</body>
+</html>
