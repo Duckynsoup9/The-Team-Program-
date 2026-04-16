@@ -1,1 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Stealth tab name for school filters -->
+    <title>Module 4: Advanced Coordinate Data Analysis</title>
+    <style>
+        body { margin: 0; background: #111; color: #0f0; font-family: 'Courier New', monospace; text-align: center; }
+        #launcher { padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; padding: 20px; }
+        .game-card { border: 2px solid #0f0; padding: 15px; cursor: pointer; transition: 0.3s; background: #000; }
+        .game-card:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+        #emulator-container { display: none; position: fixed; inset: 0; background: #000; z-index: 1000; }
+        #close-btn { position: absolute; top: 10px; right: 20px; color: red; font-size: 30px; cursor: pointer; z-index: 1001; }
+        #emu-frame { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+
+<div id="launcher">
+    <h1>[ THE PLAYERS ROM LAUNCHER ]</h1>
+    <p>Select a "Data Module" to begin analysis.</p>
+    
+    <div class="grid">
+        <!-- Pokémon for Jessie -->
+        <div class="game-card" onclick="launch('gba', 'stone_dragon_3.gba')">
+            <h3>MOD 01</h3>
+            <p>Stone Dragon 3</p>
+        </div>
+        <!-- Arcade for the Squad -->
+        <div class="game-card" onclick="launch('nes', 'super_mario_remix.nes')">
+            <h3>MOD 02</h3>
+            <p>Mario Remix</p>
+        </div>
+        <div class="game-card" onclick="launch('n64', 'smash_remix.z64')">
+            <h3>MOD 03</h3>
+            <p>Smash Remix</p>
+        </div>
+        <!-- Local HTML Game -->
+        <div class="game-card" onclick="window.location.href='snake.html'">
+            <h3>MOD 04</h3>
+            <p>Snake (Arcade)</p>
+        </div>
+    </div>
+</div>
+
+<div id="emulator-container">
+    <div id="close-btn" onclick="closeEmu()">×</div>
+    <div id="game-window" style="width:100%; height:100%;"></div>
+</div>
+
+<script type="text/javascript">
+    function launch(core, romName) {
+        // Show the container
+        document.getElementById('emulator-container').style.display = 'block';
+        
+        // Configure EmulatorJS
+        // Replace 'YOUR_GITHUB_URL' with your actual github.io link
+        window.EJS_player = '#game-window';
+        window.EJS_core = core; 
+        window.EJS_gameUrl = 'roms/' + romName; // Path to your ROMs in GitHub
+        window.EJS_pathtodata = 'https://emulatorjs.org'; // Uses official CDN
+
+        let script = document.createElement('script');
+        script.src = 'https://emulatorjs.orgloader.js';
+        document.body.appendChild(script);
+    }
+
+    function closeEmu() {
+        location.reload(); // Quick way to kill the emulator and go back
+    }
+</script>
+</body>
+</html>
 
